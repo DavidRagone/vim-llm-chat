@@ -50,7 +50,8 @@ function! s:LLMChatFZF()
         \ '--preview-window', 'up:70%:wrap',
         \ '--no-sort',
         \ '--no-multi',
-        \ '--bind', 'enter:accept',
+        \ '--bind', 'enter:accept,shift-up:preview-up,shift-down:preview-down',
+        \ '--bind', 'ctrl-u:preview-page-up,ctrl-d:preview-page-down',
         \ '--print-query'
         \ ]
   let l:spec = {
@@ -58,7 +59,7 @@ function! s:LLMChatFZF()
         \ 'sink*': function('s:OnFZFChatSend'),
         \ 'options': l:opts,
         \ 'window': {
-        \   'width': 80,
+        \   'width': 120,
         \   'height': &lines - 2,
         \   'xoffset': 1,
         \   'yoffset': 0,
