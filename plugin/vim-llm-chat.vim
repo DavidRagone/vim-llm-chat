@@ -33,7 +33,8 @@ function! s:GetFileList()
   else
     let l:dir = fnamemodify(l:gitdir, ':h')
   endif
-  return split(glob(l:dir . '/*', 0, 1), '\n')
+  " Always return a list of filenames as a List
+  return glob(l:dir . '/*', 0, 1)
 endfunction
 
 function! s:SendToLLMChat()
@@ -51,7 +52,6 @@ function! s:SendToLLMChat()
 
   let l:file_content = s:GetCurrentFileContent()
   let l:file_list = s:GetFileList()
-  " Compose prompt for llm CLI
   let l:context = 'Current file: ' . expand('%:p') . "\n" . l:file_content . "\nFiles in directory:\n" . join(l:file_list, "\n")
   let l:prompt = l:user_input . "\n\nContext:\n" . l:context
 
