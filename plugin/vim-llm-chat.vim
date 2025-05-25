@@ -47,17 +47,18 @@ function! s:LLMChatFZF()
         \ '--layout=reverse',
         \ '--info=inline',
         \ '--preview', 'cat ' . shellescape(l:history_file),
-        \ '--preview-window', 'up:50%:wrap',
+        \ '--preview-window', 'up:70%:wrap',
         \ '--no-sort',
         \ '--no-multi',
         \ '--bind', 'enter:accept',
         \ '--print-query'
         \ ]
+
   call fzf#run(fzf#wrap({
-        \ 'source': readfile(l:history_file),
+        \ 'source': 'echo',
         \ 'sink*': function('s:OnFZFChatSend'),
         \ 'options': l:opts,
-        \ 'down': '60%'
+        \ 'down': '70%'
         \ }))
 endfunction
 
