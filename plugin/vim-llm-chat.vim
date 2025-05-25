@@ -53,13 +53,19 @@ function! s:LLMChatFZF()
         \ '--bind', 'enter:accept',
         \ '--print-query'
         \ ]
-
-  call fzf#run(fzf#wrap({
-        \ 'source': 'echo',
+  let l:spec = {
+        \ 'source': [' '],
         \ 'sink*': function('s:OnFZFChatSend'),
         \ 'options': l:opts,
-        \ 'down': '70%'
-        \ }))
+        \ 'window': {
+        \   'width': 80,
+        \   'height': &lines - 2,
+        \   'xoffset': 1,
+        \   'yoffset': 0,
+        \   'highlight': 'Normal',
+        \   'border': 'none'
+        \ }}
+  call fzf#run(l:spec)
 endfunction
 
 " Handler: user submits message via FZF
