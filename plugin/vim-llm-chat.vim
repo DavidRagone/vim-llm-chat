@@ -61,10 +61,12 @@ function! s:SendToLLMChat()
   if !empty(l:model_arg)
     let l:cmd .= ' -m ' . shellescape(l:model_arg)
   endif
-  " IMPORTANT: Don't append the prompt as an argument! Pass it in as stdin.
-  echom "LLMChat running (stdin): " . l:cmd
+  echom "LLMChat running: " . l:cmd
 
   let l:response = system(l:cmd, l:prompt)
+  echom "Shell error: " . v:shell_error
+  echom "Response: " . l:response
+
   if v:shell_error
     call appendbufline(s:llmchat_bufnr, l:sepidx + 1, 'LLM: [Error running llm: ' . l:response . ']')
   else
