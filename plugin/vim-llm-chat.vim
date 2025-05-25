@@ -1,4 +1,4 @@
-" LLM Chat Plugin for Vim (Vimscript only, no Neovim dependencies)
+" LLM Chat Plugin for Vim using simonw/llm CLI (https://llm.datasette.io/)
 
 if exists('g:loaded_llmchat')
   finish
@@ -51,20 +51,17 @@ function! s:SendToLLMChat()
 
   let l:file_content = s:GetCurrentFileContent()
   let l:file_list = s:GetFileList()
-  let l:payload = {
-        \ 'question': l:user_input,
-        \ 'file_content': l:file_content,
-        \ 'file_list': l:file_list
-        \ }
-  let l:json = json_encode(l:payload)
-  let l:api_url = get(g:, 'llmchat_api_url', 'https://your-llm-api.com/chat')
-  let l:auth = get(g:, 'llmchat_api_auth_header', '')
+  " Compose prompt for llm CLI
+  let l:context = 'Current file: ' . expand('%:p') . "\n" . l:file_content . "\nFiles in directory:\n" . join(l:file_list, "\n")
+  let l:prompt = l:user_input . "\n\nContext:\n" . l:context
 
-  let l:cmd = 'curl -s -X POST -H "Content-Type: application/json"'
-  if !empty(l:auth)
-    let l:cmd .= ' -H ' . shellescape(l:auth)
+  let l:llm_cmd = get(g:, 'llmchat_llm_command', 'llm')
+  let l:model_arg = get(g:, 'llmchat_llm_model_arg', '')
+  let l:cmd = l:llm_cmd
+  if !empty(l:model_arg)
+    let l:cmd .= ' -m ' . shellescape(l:model_arg)
   endif
-  let l:cmd .= ' --data ' . shellescape(l:json) . ' ' . shellescape(l:api_url)
+  let l:cmd .= ' ' . shellescape(l:prompt)
   let l:response = system(l:cmd)
 
   " Append chat history

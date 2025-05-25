@@ -1,6 +1,6 @@
-# LLM Chat for Vim
+# LLM Chat for Vim (with simonw/llm CLI)
 
-**LLM Chat for Vim** is a pure Vimscript plugin that brings a chat-like interface powered by any LLM (Large Language Model) API directly into Vim. Ask questions, get code explanations, and plan work—all from within your editor. The plugin sends your current file and project directory context to your LLM and displays responses in a chat buffer.
+**LLM Chat for Vim** is a pure Vimscript plugin that brings a chat-like AI interface directly into Vim, powered by the [llm](https://github.com/simonw/llm) command-line tool. Ask questions, get code explanations, and plan work—all from within your editor. The plugin sends your current file and project directory context to your local LLM, and displays responses in a chat buffer.
 
 ---
 
@@ -9,7 +9,7 @@
 - Chat interface in a special Vim buffer
 - Sends current file contents and file list for context
 - Displays conversational history inline
-- Works with any LLM API that accepts JSON POST requests
+- Uses [llm](https://llm.datasette.io/) command-line tool for local or API-backed LLMs
 - Pure Vimscript—works with Vim (8.0+) and Neovim
 
 ---
@@ -19,11 +19,9 @@
 ### Vundle
 
 Add this to your `.vimrc`:
-
 ```vim
 Plugin 'DavidRagone/vim-llm-chat'
 ```
-
 Then run:
 
 ```
@@ -36,7 +34,6 @@ Then run:
 ```vim
 Plug 'DavidRagone/vim-llm-chat'
 ```
-
 Then:
 
 ```
@@ -46,24 +43,33 @@ Then:
 
 ### Pathogen
 
-```
+```sh
 git clone https://github.com/DavidRagone/vim-llm-chat ~/.vim/bundle/vim-llm-chat
 ```
 
 ### Manual
 
-Download `plugin/vim-llm-chat.vim` and place it in `~/.vim/plugin/`.
+Download `plugin/vim-llm-chat` and place it in `~/.vim/plugin/`.
+
+---
+
+## Requirements
+
+- Vim 8.0+ with `+channel` or `+job` support (Neovim supported as well)
+- [`llm` CLI](https://llm.datasette.io/en/stable/installation.html) installed and configured
+- Any models or API keys you want to use with `llm` (see [llm setup docs](https://llm.datasette.io/))
 
 ---
 
 ## Setup
 
-Add your LLM API endpoint (and, if needed, authorization header) to your `.vimrc`:
+Optionally, set the LLM model to use in your `.vimrc`:
 
 ```vim
-let g:llmchat_api_url = 'https://your-llm-api.com/chat'
-let g:llmchat_api_auth_header = 'Authorization: Bearer YOUR_TOKEN'   " If needed
+let g:llmchat_llm_command = 'llm'              " Path to your llm executable (default: 'llm')
+let g:llmchat_llm_model_arg = 'gpt-4-turbo'    " Optional: specify model, e.g. 'gpt-3.5-turbo'
 ```
+If you omit `llmchat_llm_model_arg`, the default model configured in your `llm` tool will be used.
 
 ---
 
@@ -79,23 +85,23 @@ You can continue the conversation by repeating steps 3-5.
 
 ---
 
-## Requirements
+## How It Works
 
-- Vim 8.0+ with `+channel` or `+job` support (Neovim supported as well)
-- `curl` available in your system PATH
-- An LLM API endpoint that accepts JSON POST requests and returns a plain text response
+- The plugin assembles a prompt containing your question, the current file contents, and a list of files in your project directory.
+- The prompt is sent to the `llm` tool, which returns a response using your chosen model/API.
+- The conversation history appears in the chat buffer.
 
 ---
 
 ## Security
 
-**Never send private code or sensitive data to a third-party API without verifying the endpoint and reviewing its privacy policy.**
+Your code and questions are sent to the `llm` tool. Depending on your model configuration, this may result in your data being sent to remote APIs (OpenAI, etc.) or processed locally. **Check your `llm` configuration and privacy preferences.**
 
 ---
 
 ## Customization
 
-You can customize the plugin commands or buffer name by modifying `plugin/llmchat.vim`.
+You can customize the plugin commands or buffer name by modifying `plugin/vim-llm-chat`.
 
 ---
 
@@ -110,4 +116,8 @@ MIT
 Pull requests and issues are welcome!
 
 ---
+
+## Credits
+
+Built on top of the workflow inspired by GitHub Copilot Chat and [llm](https://llm.datasette.io/).
 
