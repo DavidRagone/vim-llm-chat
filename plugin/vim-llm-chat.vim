@@ -42,18 +42,17 @@ endfunction
 " Main FZF chat loop (called after each turn)
 function! s:LLMChatFZF()
   let l:history_file = s:WriteHistoryToFile()
-
   let l:opts = [
         \ '--prompt=You: ',
         \ '--layout=reverse',
         \ '--info=inline',
-        \ '--preview', 'sh -c "cat ' . shellescape(l:history_file) . '"',
+        \ '--preview', 'cat ' . shellescape(l:history_file),
         \ '--preview-window', 'up:50%:wrap',
         \ '--no-sort',
         \ '--no-multi',
-        \ '--bind', 'enter:accept'
+        \ '--bind', 'enter:accept',
+        \ '--print-query'
         \ ]
-  " Show fzf with chat lines as the candidate list, using prompt for next message
   call fzf#run(fzf#wrap({
         \ 'source': readfile(l:history_file),
         \ 'sink*': function('s:OnFZFChatSend'),
@@ -64,10 +63,12 @@ endfunction
 
 " Handler: user submits message via FZF
 function! s:OnFZFChatSend(lines)
-  " fzf passes a list of selected lines; user's message is in <q-args>
-  " But fzf#wrap does not pass prompt input, so we have to grab from input()
-  " Instead, prompt user for message after fzf closes
-  let l:input = input('You: ')
+  if len(a:lines) == 0
+    return
+  endif
+
+  " First line is the user's typed input (from --print-query)
+  let l:input = a:lines[0]
   if !empty(trim(l:input))
     call add(s:llmchat_history, 'You: ' . l:input)
     redraw | echo "Waiting for LLM..."
