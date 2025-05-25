@@ -62,11 +62,17 @@ function! s:SendToLLMChat()
     let l:cmd .= ' -m ' . shellescape(l:model_arg)
   endif
   let l:cmd .= ' ' . shellescape(l:prompt)
-  let l:response = system(l:cmd)
 
-  " Append chat history
-  call appendbufline(s:llmchat_bufnr, l:sepidx, 'User: ' . l:user_input)
-  call appendbufline(s:llmchat_bufnr, l:sepidx + 1, 'LLM: ' . l:response)
+  " Debug: echo the command
+  echom "LLMChat running: " . l:cmd
+
+  let l:response = system(l:cmd)
+  if v:shell_error
+    call appendbufline(s:llmchat_bufnr, l:sepidx + 1, 'LLM: [Error running llm: ' . l:response . ']')
+  else
+    call appendbufline(s:llmchat_bufnr, l:sepidx, 'User: ' . l:user_input)
+    call appendbufline(s:llmchat_bufnr, l:sepidx + 1, 'LLM: ' . l:response)
+  endif
   " Reset input area
   call deletebufline(s:llmchat_bufnr, l:sepidx+2, '$')
   call appendbufline(s:llmchat_bufnr, '$', '---')
