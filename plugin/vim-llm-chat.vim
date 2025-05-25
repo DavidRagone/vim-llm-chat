@@ -42,11 +42,12 @@ endfunction
 " Main FZF chat loop (called after each turn)
 function! s:LLMChatFZF()
   let l:history_file = s:WriteHistoryToFile()
+
   let l:opts = [
         \ '--prompt=You: ',
         \ '--layout=reverse',
         \ '--info=inline',
-        \ '--preview', 'cat ' . shellescape(l:history_file),
+        \ '--preview', 'sh -c "cat ' . shellescape(l:history_file) . '"',
         \ '--preview-window', 'up:50%:wrap',
         \ '--no-sort',
         \ '--no-multi',
@@ -54,7 +55,7 @@ function! s:LLMChatFZF()
         \ ]
   " Show fzf with chat lines as the candidate list, using prompt for next message
   call fzf#run(fzf#wrap({
-        \ 'source': l:history_file,
+        \ 'source': readfile(l:history_file),
         \ 'sink*': function('s:OnFZFChatSend'),
         \ 'options': l:opts,
         \ 'down': '60%'
