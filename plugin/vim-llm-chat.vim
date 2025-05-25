@@ -1,83 +1,81 @@
-" LLM Chat Plugin for Vim using simonw/llm CLI (https://llm.datasette.io/)
+" LLMChat: FZF-based Chat UI for Vim with LLM backend
+" Requires fzf.vim and simonw/llm CLI installed and available in your $PATH
 
 if exists('g:loaded_llmchat')
   finish
 endif
 let g:loaded_llmchat = 1
 
-let s:llmchat_bufnr = -1
+" In-memory chat history (as a List of strings)
+let s:llmchat_history = []
 
-function! s:OpenChatBuffer()
-  if bufexists('LLMChat')
-    execute 'buffer ' . bufnr('LLMChat')
-    let s:llmchat_bufnr = bufnr('LLMChat')
-  else
-    new
-    setlocal buftype=nofile bufhidden=hide nobuflisted noswapfile
-    file LLMChat
-    let s:llmchat_bufnr = bufnr('%')
-    call setline(1, ['LLM Chat', 'Type your message below the separator, then run :LLMSend'])
-    call append(line('$'), '---')
-    normal! G
-  endif
+" Write chat history to a temp file, return the filename
+function! s:WriteHistoryToFile()
+  let l:file = '/tmp/llmchat_history_' . printf('%d', localtime()) . '_' . printf('%d', rand())
+  call writefile(s:llmchat_history, l:file)
+  call system('chmod 644 ' . shellescape(l:file))
+  return l:file
 endfunction
 
-function! s:GetCurrentFileContent()
-  return join(getbufline(bufnr('#'), 1, '$'), "\n")
-endfunction
-
-function! s:GetFileList()
-  let l:gitdir = finddir('.git', expand('%:p:h').';')
-  if empty(l:gitdir)
-    let l:dir = expand('%:p:h')
-  else
-    let l:dir = fnamemodify(l:gitdir, ':h')
-  endif
-  " Always return a list of filenames as a List
-  return glob(l:dir . '/*', 0, 1)
-endfunction
-
-function! s:SendToLLMChat()
-  let l:lines = getbufline(s:llmchat_bufnr, 1, '$')
-  let l:sepidx = index(l:lines, '---')
-  if l:sepidx == -1
-    call appendbufline(s:llmchat_bufnr, '$', '---')
-    let l:sepidx = len(l:lines)
-  endif
-  let l:user_input = join(l:lines[(l:sepidx+1):], "\n")
-  if empty(trim(l:user_input))
-    echo "No message to send."
-    return
-  endif
-
-  let l:file_content = s:GetCurrentFileContent()
-  let l:file_list = s:GetFileList()
-  let l:context = 'Current file: ' . expand('%:p') . "\n" . l:file_content . "\nFiles in directory:\n" . join(l:file_list, "\n")
-  let l:prompt = l:user_input . "\n\nContext:\n" . l:context
-
+" Call the LLM backend with the given prompt, return the response as string
+function! s:AskLLM(prompt)
   let l:llm_cmd = get(g:, 'llmchat_llm_command', 'llm')
   let l:model_arg = get(g:, 'llmchat_llm_model_arg', '')
   let l:cmd = l:llm_cmd
   if !empty(l:model_arg)
     let l:cmd .= ' -m ' . shellescape(l:model_arg)
   endif
-  echom "LLMChat running: " . l:cmd
-
-  let l:response = system(l:cmd, l:prompt)
-  echom "Shell error: " . v:shell_error
-  echom "Response: " . l:response
-
-  if v:shell_error
-    call appendbufline(s:llmchat_bufnr, l:sepidx + 1, 'LLM: [Error running llm: ' . l:response . ']')
-  else
-    call appendbufline(s:llmchat_bufnr, l:sepidx, 'User: ' . l:user_input)
-    call appendbufline(s:llmchat_bufnr, l:sepidx + 1, 'LLM: ' . l:response)
-  endif
-  " Reset input area
-  call deletebufline(s:llmchat_bufnr, l:sepidx+2, '$')
-  call appendbufline(s:llmchat_bufnr, '$', '---')
-  call cursor(s:llmchat_bufnr, line('$'), 1)
+  return system(l:cmd, a:prompt)
 endfunction
 
-command! LLMChat call s:OpenChatBuffer()
-command! LLMSend call s:SendToLLMChat()
+" FZF chat main entry point
+function! LLMChat()
+  " Use global so user can keep chat between invocations
+  if exists('g:llmchat_history')
+    let s:llmchat_history = g:llmchat_history
+  else
+    let s:llmchat_history = []
+  endif
+  call s:LLMChatFZF()
+endfunction
+
+" Main FZF chat loop (called after each turn)
+function! s:LLMChatFZF()
+  let l:history_file = s:WriteHistoryToFile()
+  let l:opts = [
+        \ '--prompt=You: ',
+        \ '--layout=reverse',
+        \ '--info=inline',
+        \ '--preview', 'cat ' . shellescape(l:history_file),
+        \ '--preview-window', 'up:50%:wrap',
+        \ '--no-sort',
+        \ '--no-multi',
+        \ '--bind', 'enter:accept'
+        \ ]
+  " Show fzf with chat lines as the candidate list, using prompt for next message
+  call fzf#run(fzf#wrap({
+        \ 'source': l:history_file,
+        \ 'sink*': function('s:OnFZFChatSend'),
+        \ 'options': l:opts,
+        \ 'down': '60%'
+        \ }))
+endfunction
+
+" Handler: user submits message via FZF
+function! s:OnFZFChatSend(lines)
+  " fzf passes a list of selected lines; user's message is in <q-args>
+  " But fzf#wrap does not pass prompt input, so we have to grab from input()
+  " Instead, prompt user for message after fzf closes
+  let l:input = input('You: ')
+  if !empty(trim(l:input))
+    call add(s:llmchat_history, 'You: ' . l:input)
+    redraw | echo "Waiting for LLM..."
+    let l:response = s:AskLLM(l:input)
+    call add(s:llmchat_history, 'LLM: ' . substitute(l:response, '\n\+$', '', ''))
+    let g:llmchat_history = s:llmchat_history
+    call s:LLMChatFZF()
+  endif
+endfunction
+
+" Command to start chat
+command! LLMChat call LLMChat()
