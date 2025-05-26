@@ -13,19 +13,20 @@ let s:llmchat_history = []
 
 " Ensure the history buffer exists and return its buffer number
 function! s:EnsureHistoryBuffer()
-  let l:bufnr = bufnr('__LLMChatHistory__')
-  if l:bufnr == -1
-    let l:bufnr = nvim_create_buf(v:false, v:true) " buflisted=false, scratch=true
-    call nvim_buf_set_name(l:bufnr, '__LLMChatHistory__')
+  let l:bufname = '__LLMChatHistory__'
+  let l:bufnr = bufnr(l:bufname)
+  if l:bufnr == -1 || !bufexists(l:bufnr) " Check if buffer exists, bufnr can return a number for non-existent buffer name
+    let l:bufnr = bufadd(l:bufname)
     call setbufvar(l:bufnr, '&buftype', 'nofile')
     call setbufvar(l:bufnr, '&bufhidden', 'hide')
-    call setbufvar(l:bufnr, '&swapfile', v:false)
+    call setbufvar(l:bufnr, '&swapfile', 0)     " Note: Vim uses 0 for false
+    call setbufvar(l:bufnr, '&buflisted', 0)    " Explicitly unlist
   endif
   return l:bufnr
 endfunction
 
-let s:history_win_id = -1
-let s:input_win_id = -1
+let s:history_win_id = 0 " Use 0 to indicate no window, as window numbers are > 0
+let s:input_win_id = 0   " Use 0 to indicate no window
 let s:input_bufnr = -1
 let s:is_first_exchange_in_session = 1
 
@@ -46,38 +47,48 @@ function! s:OpenChatWindows()
 
   " Create history window
   execute l:history_height . 'new'
-  let s:history_win_id = win_getid()
-  call win_execute(s:history_win_id, 'buffer ' . l:history_bufnr)
+  let s:history_win_id = winnr() " Get current window NUMBER
+  execute 'buffer ' . l:history_bufnr " Associate buffer with this new window
   call setwinvar(s:history_win_id, '&winfixheight', 1)
-  call setwinvar(s:history_win_id, '&readonly', 1)
-  " Set buffer options for history buffer
-  call setbufvar(l:history_bufnr, '&wrap', 1) " Ensure wrap is on for the buffer
-  call setbufvar(l:history_bufnr, '&list', 0) " Disable list characters
-  call setbufvar(l:history_bufnr, '&spell', 0) " Disable spell checking
-  call nvim_buf_set_keymap(l:history_bufnr, 'n', 'q', ':call s:CloseChatWindows()<CR>', {'noremap': v:true, 'silent': v:true})
+  call setbufvar(l:history_bufnr, '&readonly', 1)
+  call setbufvar(l:history_bufnr, '&wrap', 1)
+  call setbufvar(l:history_bufnr, '&list', 0)
+  call setbufvar(l:history_bufnr, '&spell', 0)
+
+  " Set keymap for history window
+  let l:original_winnr = winnr()
+  execute s:history_win_id . "wincmd w" " Focus history window
+  execute 'nnoremap <buffer><silent> q :call <SID>CloseChatWindows()<CR>'
+  execute l:original_winnr . "wincmd w" " Focus original window
 
   " Create input window
-  execute 'new'
-  let s:input_win_id = win_getid()
-  let s:input_bufnr = nvim_create_buf(v:false, v:true) " buflisted=false, scratch=true
-  call nvim_buf_set_name(s:input_bufnr, '__LLMChatInput__')
+  execute 'new' " This creates a new window and makes it current
+  let s:input_win_id = winnr() " Get current window NUMBER for the new input window
+  let s:input_bufname = '__LLMChatInput__' " Name for the input buffer
+  let s:input_bufnr = bufnr(s:input_bufname)
+  if s:input_bufnr == -1 || !bufexists(s:input_bufnr)
+    let s:input_bufnr = bufadd(s:input_bufname)
+  endif
+  execute 'buffer ' . s:input_bufnr " Associate buffer with the new input window
   call setbufvar(s:input_bufnr, '&buftype', 'nofile')
   call setbufvar(s:input_bufnr, '&bufhidden', 'hide')
-  call setbufvar(s:input_bufnr, '&swapfile', v:false)
-  call win_execute(s:input_win_id, 'buffer ' . s:input_bufnr)
+  call setbufvar(s:input_bufnr, '&swapfile', 0)
+  call setbufvar(s:input_bufnr, '&buflisted', 0)
+  call setbufvar(s:input_bufnr, '&modifiable', 1)
+
   call setwinvar(s:input_win_id, '&winfixheight', 1)
   execute 'resize ' . l:input_height
 
   " Set buffer-local mappings for <CR> and q in the input window
-  if s:input_bufnr != -1
-    call nvim_buf_set_keymap(s:input_bufnr, 'n', '<CR>', ':call s:SubmitInput()<CR>', {'noremap': v:true, 'silent': v:true})
-    call nvim_buf_set_keymap(s:input_bufnr, 'i', '<CR>', '<Esc>:call s:SubmitInput()<CR>', {'noremap': v:true, 'silent': v:true})
-    call nvim_buf_set_keymap(s:input_bufnr, 'n', 'q', ':call s:CloseChatWindows()<CR>', {'noremap': v:true, 'silent': v:true})
-    call setbufvar(s:input_bufnr, '&modifiable', 1) " Ensure buffer is modifiable
-  endif
+  let l:original_winnr_for_input_map = winnr()
+  execute s:input_win_id . "wincmd w" " Focus input window
+  execute 'nnoremap <buffer><silent> <CR> :<C-U>call <SID>SubmitInput()<CR>'
+  execute 'inoremap <buffer><silent> <CR> <Esc>:<C-U>call <SID>SubmitInput()<CR>'
+  execute 'nnoremap <buffer><silent> q :<C-U>call <SID>CloseChatWindows()<CR>'
+  execute l:original_winnr_for_input_map . "wincmd w" " Focus original window
 
   " Switch focus to input window and start insert mode
-  call win_gotoid(s:input_win_id)
+  execute s:input_win_id . "wincmd w" " Focus input window
   startinsert
 endfunction
 
@@ -86,43 +97,53 @@ function! s:DisplayHistory()
   let l:history_bufnr = s:EnsureHistoryBuffer()
 
   " Make buffer modifiable to clear and append lines
-  call nvim_buf_set_option(l:history_bufnr, 'modifiable', v:true)
+  call setbufvar(l:history_bufnr, '&modifiable', 1)
 
   " Clear the buffer
-  call nvim_buf_set_lines(l:history_bufnr, 0, -1, v:false, [])
+  call deletebufline(l:history_bufnr, 1, '$')
 
   " Append history lines
   if exists('g:llmchat_history') && !empty(g:llmchat_history)
-    call nvim_buf_set_lines(l:history_bufnr, 0, 0, v:false, g:llmchat_history)
+    call appendbufline(l:history_bufnr, '$', g:llmchat_history)
   endif
 
-  " Make buffer readonly again
-  call nvim_buf_set_option(l:history_bufnr, 'modifiable', v:false)
+  " Make buffer readonly again and reset modified status
+  call setbufvar(l:history_bufnr, '&modifiable', 0)
+  call setbufvar(l:history_bufnr, '&modified', 0)
 
   " Go to the last line in the history window
-  if s:history_win_id != -1 && win_id2win(s:history_win_id) > 0
-    call win_execute(s:history_win_id, 'normal! G')
+  if s:history_win_id > 0 && winbufnr(s:history_win_id) > 0 " Check if window number is valid
+    let l:original_winnr_hist_scroll = winnr()
+    execute s:history_win_id . "wincmd w" " Focus history window
+    normal! G
+    execute l:original_winnr_hist_scroll . "wincmd w" " Focus original window
   endif
 endfunction
 
 " Close the chat windows and clean up
 function! s:CloseChatWindows()
   " Close history window
-  if s:history_win_id != -1 && win_id2win(s:history_win_id) > 0
-    call nvim_win_close(s:history_win_id, v:true) " force close
+  if s:history_win_id > 0 && winbufnr(s:history_win_id) > 0 " Check if window number is valid
+    execute s:history_win_id . 'wincmd c'
   endif
-  let s:history_win_id = -1
+  let s:history_win_id = 0
 
-  " Close input window and delete its buffer
-  if s:input_win_id != -1 && win_id2win(s:input_win_id) > 0
-    call nvim_win_close(s:input_win_id, v:true) " force close
+  " Close input window
+  if s:input_win_id > 0 && winbufnr(s:input_win_id) > 0 " Check if window number is valid
+    execute s:input_win_id . 'wincmd c'
   endif
-  let s:input_win_id = -1
+  let s:input_win_id = 0
 
+  " Delete the input buffer
   if s:input_bufnr != -1 && bufexists(s:input_bufnr)
-    call nvim_buf_delete(s:input_bufnr, {'force': v:true})
+    execute 'bwipeout! ' . s:input_bufnr
   endif
   let s:input_bufnr = -1
+
+  " Note: History buffer __LLMChatHistory__ is not wiped out here,
+  " so it can persist across sessions if g:llmchat_history is saved/restored.
+  " If we wanted to wipe it, we'd need s:EnsureHistoryBuffer to return its name too
+  " or find it by name here and wipe it. For now, it's left as is.
 endfunction
 
 " Handle user input submission from the input window
@@ -159,13 +180,15 @@ function! s:SubmitInput()
     call s:DisplayHistory() " Display the "LLM:" message
 
     " Clear the input buffer
-    call nvim_buf_set_lines(s:input_bufnr, 0, -1, v:false, [''])
+    call setbufvar(s:input_bufnr, '&modifiable', 1) " Ensure it's modifiable before clearing
+    call deletebufline(s:input_bufnr, 1, line('$')) " Clear all lines
+    call appendbufline(s:input_bufnr, 0, [''])      " Add a single empty line to start
+    " call setbufvar(s:input_bufnr, '&modifiable', 1) " Buffer should remain modifiable
   endif
 
   " Ensure input window is in insert mode and cursor at line 1, column 1
-  if s:input_win_id != -1 && win_id2win(s:input_win_id) > 0
-    call cursor(1, 1) " Position cursor at the beginning of the buffer
-    call win_execute(s:input_win_id, 'startinsert')
+  if s:input_win_id > 0 && winbufnr(s:input_win_id) > 0 " Vim-compatible check
+    call win_execute(s:input_win_id, 'call cursor(1, 1) | startinsert')
   endif
 endfunction
 
