@@ -48,7 +48,8 @@ function! s:OpenChatWindows()
   " Create history window
   execute l:history_height . 'new'
   let s:history_win_id = winnr() " Get current window NUMBER
-  execute 'buffer ' . l:history_bufnr " Associate buffer with this new window
+  " Associate buffer with this new window
+  execute 'buffer ' . l:history_bufnr 
   call setwinvar(s:history_win_id, '&winfixheight', 1)
   call setbufvar(l:history_bufnr, '&readonly', 1)
   call setbufvar(l:history_bufnr, '&wrap', 1)
@@ -57,19 +58,23 @@ function! s:OpenChatWindows()
 
   " Set keymap for history window
   let l:original_winnr = winnr()
-  execute s:history_win_id . "wincmd w" " Focus history window
+  " Focus history window
+  execute s:history_win_id . "wincmd w" 
   execute 'nnoremap <buffer><silent> q :call <SID>CloseChatWindows()<CR>'
-  execute l:original_winnr . "wincmd w" " Focus original window
+  " Focus original window
+  execute l:original_winnr . "wincmd w" 
 
   " Create input window
-  execute 'new' " This creates a new window and makes it current
+  " This creates a new window and makes it current
+  execute 'new' 
   let s:input_win_id = winnr() " Get current window NUMBER for the new input window
   let s:input_bufname = '__LLMChatInput__' " Name for the input buffer
   let s:input_bufnr = bufnr(s:input_bufname)
   if s:input_bufnr == -1 || !bufexists(s:input_bufnr)
     let s:input_bufnr = bufadd(s:input_bufname)
   endif
-  execute 'buffer ' . s:input_bufnr " Associate buffer with the new input window
+  " Associate buffer with the new input window
+  execute 'buffer ' . s:input_bufnr 
   call setbufvar(s:input_bufnr, '&buftype', 'nofile')
   call setbufvar(s:input_bufnr, '&bufhidden', 'hide')
   call setbufvar(s:input_bufnr, '&swapfile', 0)
@@ -81,14 +86,17 @@ function! s:OpenChatWindows()
 
   " Set buffer-local mappings for <CR> and q in the input window
   let l:original_winnr_for_input_map = winnr()
-  execute s:input_win_id . "wincmd w" " Focus input window
+  " Focus input window
+  execute s:input_win_id . "wincmd w" 
   execute 'nnoremap <buffer><silent> <CR> :<C-U>call <SID>SubmitInput()<CR>'
   execute 'inoremap <buffer><silent> <CR> <Esc>:<C-U>call <SID>SubmitInput()<CR>'
   execute 'nnoremap <buffer><silent> q :<C-U>call <SID>CloseChatWindows()<CR>'
-  execute l:original_winnr_for_input_map . "wincmd w" " Focus original window
+  " Focus original window
+  execute l:original_winnr_for_input_map . "wincmd w" 
 
   " Switch focus to input window and start insert mode
-  execute s:input_win_id . "wincmd w" " Focus input window
+  " Focus input window
+  execute s:input_win_id . "wincmd w" 
   startinsert
 endfunction
 
@@ -114,9 +122,11 @@ function! s:DisplayHistory()
   " Go to the last line in the history window
   if s:history_win_id > 0 && winbufnr(s:history_win_id) > 0 " Check if window number is valid
     let l:original_winnr_hist_scroll = winnr()
-    execute s:history_win_id . "wincmd w" " Focus history window
+    " Focus history window
+    execute s:history_win_id . "wincmd w" 
     normal! G
-    execute l:original_winnr_hist_scroll . "wincmd w" " Focus original window
+    " Focus original window
+    execute l:original_winnr_hist_scroll . "wincmd w" 
   endif
 endfunction
 
@@ -183,7 +193,7 @@ function! s:SubmitInput()
     call setbufvar(s:input_bufnr, '&modifiable', 1) " Ensure it's modifiable before clearing
     call deletebufline(s:input_bufnr, 1, line('$')) " Clear all lines
     call appendbufline(s:input_bufnr, 0, [''])      " Add a single empty line to start
-    " call setbufvar(s:input_bufnr, '&modifiable', 1) " Buffer should remain modifiable
+    call setbufvar(s:input_bufnr, '&modifiable', 1) " Buffer should remain modifiable
   endif
 
   " Ensure input window is in insert mode and cursor at line 1, column 1
